@@ -1,0 +1,12 @@
+mrtrix image
+dim: 128,128,26
+vox: 1.75,1.75,2
+layout: -0,-1,+2
+datatype: Float32LE
+transform: 0.998429966649842, -0.0339519111561906, 0.0445518792516255, -105.93099246237
+transform: 0.0467871974940659, 0.942809259971049, -0.330032826092738, -108.237060413321
+transform: -0.0307986987752314, 0.331599105912072, 0.942917527547552, -55.07932424013
+command_history: C:\msys64\mingw64\bin\mrview.exe -load fa.nii -tractography.load Acendent/track_20.tck -tractography.load Acendent/track_40.tck -tractography.load Acendent/track_60.tck -tractography.load Acendent/track_80.tck -tractography.load Acendent/track_100.tck  (version=3.0.2)
+comments: FSL5.0
+mrtrix_version: 3.0.2
+file: Filtering_comparaison.dat

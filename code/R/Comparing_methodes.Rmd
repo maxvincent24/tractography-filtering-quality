@@ -1,0 +1,150 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Datas
+
+Firstly, we load and concatenate the dataframes
+
+```{r}
+FA_Dice_Array <- read.csv("../../table_results/FA_Dice_Array.csv")
+FOD_Dice_Array <- read.csv("../../table_results/FOD_Dice_Array.csv")
+Rand_Dice_Array <- read.csv("../../table_results/Rand_Dice_Array.csv")
+Entropy_Dice_Array <- read.csv("../../table_results/Entropy_Dice_Array.csv")
+
+Dice_Array = rbind(FA_Dice_Array, FOD_Dice_Array, Rand_Dice_Array, Entropy_Dice_Array)
+colnames(Dice_Array) <- c("Patient","Nerve", "Parameter", "Condition", "SD_max","Index","Threshold","SD_init","Method")
+```
+
+
+We then clean the dataframe
+
+```{r}
+nrep = length(Dice_Array$Patient)/19
+Dice_Array$Condition <- rep(c(c(1,2,3,4), rep(c(1,2,3,4,5), 3)), nrep)
+
+Dice_Array$Condition <- as.factor(Dice_Array$Condition)
+
+Dice_Array$SD_max[Dice_Array$SD_init <= 0.01] = NA
+Dice_Array$SD_max[Dice_Array$SD_init <= 0.01] = NA
+
+levels(Dice_Array$Nerve) <- c(levels(Dice_Array$Nerve), c("III","NF","NM","V")) 
+Dice_Array$Nerve[Dice_Array$Nerve == 'IIID' | Dice_Array$Nerve == 'IIIG'] <- "III"
+Dice_Array$Nerve[Dice_Array$Nerve == 'NFD' | Dice_Array$Nerve == 'NFG'] <- "NF"
+Dice_Array$Nerve[Dice_Array$Nerve == 'NMD' | Dice_Array$Nerve == 'NMG'] <- "NM"
+Dice_Array$Nerve[Dice_Array$Nerve == 'VD' | Dice_Array$Nerve == 'VG'] <- "V"
+
+```
+
+## SD_Max
+
+We look at the SDmax value wich is an indicator of the filtering performance
+
+### Mean Median and Var of SDmax
+
+```{r}
+ag1 <- aggregate( SD_max ~ Method, Dice_Array, mean )
+ag1$median <- aggregate( SD_max ~ Method, Dice_Array, median)$SD_max
+ag1$var <- aggregate( SD_max ~ Method, Dice_Array, var )$SD_max
+colnames(ag1)[2] <- "Mean"
+ag1
+```
+All three non random methods seems better than the random one. FOD seem to be 
+the overall best method. However, we do not know how significant the differences
+between the entropy and the other methode are.
+
+### Wilcox test
+
+With no assumption on the data distribution, but paired data between methods, 
+a Wilcox test semms to be the better option.
+```{r}
+
+pairwise.wilcox.test(Dice_Array$SD_max, Dice_Array$Method,
+                     p.adjust.method = "BH")
+pairwise.wilcox.test(Dice_Array[Dice_Array$Nerve == "Chiasma", ]$SD_max,
+                     Dice_Array[Dice_Array$Nerve == "Chiasma", ]$Method,
+                     p.adjust.method = "BH")
+```
+
+Only the FOD and Random methods seem to have significant difference with the 
+Entropy methods
+
+### Linear Models
+
+In order to have a better overview at the effect of each methods, despite other
+variables, we will build a set of more and more complex linear model.
+
+```{r}
+
+mod1 = lm(Dice_Array$SD_max ~  Dice_Array$Method)
+summary(mod1)
+```
+
+```{r}
+mod2 = lm(Dice_Array$SD_max ~ Dice_Array$Method + Dice_Array$Nerve)
+summary(mod2)
+```
+
+```{r}
+mod3 = lm(Dice_Array$SD_max ~ Dice_Array$Method + Dice_Array$Parameter)
+summary(mod3)
+```
+
+```{r}
+mod4 = lm(Dice_Array$SD_max ~ + Dice_Array$Method + Dice_Array$Nerve + Dice_Array$Parameter, Dice_Array)
+summary(mod4)
+```
+
+```{r}
+mod5 = lm(Dice_Array$SD_max ~ + Dice_Array$Method + Dice_Array$Nerve + Dice_Array$Parameter + Dice_Array$Condition, Dice_Array)
+summary(mod5)
+```
+### Conclusion on SD_max:
+
+The entropy method seems to bring a significant improvement of SD max other 
+the random one (+ 0.07, pval < 2e-16). However, the FOD method is slightly 
+better than entropy (+0.015, pval = 0.042). There is no significant difference 
+in results between FA and Entropy methods.
+
+## Threshold
+
+We then look at the Threshold value witch is an indicator of the filtering 
+robustness. Indeed, if the Threshold for the best SD is conserved, we can
+expect to have better a-priory filtering.
+```{r}
+ag1 <- aggregate( Threshold ~ Method, Dice_Array, mean )
+ag2 <- aggregate( Threshold ~ Method, Dice_Array, var )
+
+ag1$Threshold_var <- ag2$Threshold
+ag1$Threshold_relative_var <- ag2$Threshold / ag1$Threshold
+colnames(ag1)[2] <- "Threshold_Mean"
+ag1
+```
+Both Entropy and FOD seems to have conservative threshold values.
+```{r}
+library(ggplot2)
+
+
+Relativ_thresh = Dice_Array$Threshold
+Relativ_thresh[Dice_Array$Method =="Entropy"] = Dice_Array[Dice_Array$Method =="Entropy","Threshold"]/mean(Dice_Array[Dice_Array$Method =="Entropy", "Threshold"],na.rm = TRUE)
+Relativ_thresh[Dice_Array$Method =="FA"] = Dice_Array[Dice_Array$Method =="FA","Threshold"]/mean(Dice_Array[Dice_Array$Method =="FA","Threshold"],na.rm = TRUE)
+Relativ_thresh[Dice_Array$Method =="FOD"] = Dice_Array[Dice_Array$Method =="FOD","Threshold"]/mean(Dice_Array[Dice_Array$Method =="FOD","Threshold"],na.rm = TRUE)
+
+ggplot(Dice_Array[Dice_Array$Method !="Rand",], aes(y=Relativ_thresh[Dice_Array$Method !="Rand"], x=Nerve, fill=Method))+ geom_boxplot()+ggtitle("Comparing threshold range between methodes ") + ylab("Relative Best Tresh (mean = 1)") +ylim(0,4)
+
+```
+The Entropy method appear to be far more interesting to chose a filtering threshold
+```{r}
+library(ggplot2)
+
+
+
+ggplot(Dice_Array[Dice_Array$Method !="Rand",], aes(y=Dice_Array$Index[Dice_Array$Method !="Rand"], x=Nerve, fill=Method))+ geom_boxplot()+ggtitle("Comparing Index range between methodes ") + ylab("Index")
+
+```
+

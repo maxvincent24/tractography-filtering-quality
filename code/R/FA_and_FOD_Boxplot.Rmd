@@ -1,0 +1,298 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+# Filltering tractography with FA and FOD: Dice Results Preview
+
+### Introduction
+
+##### Lodding datas
+
+There are 2 dataframes with results for filtering tracks with their mean FA and FOD values
+```{r}
+library(ggplot2)
+FA_Dice_Array_init <- read.csv("../../table_results/FA_Dice_Array.csv")
+FOD_Dice_Array_init <- read.csv("../../table_results/FOD_Dice_Array.csv")
+
+```
+
+##### Pré traitmement
+
+  **Fusion des groupe gauche et droit**
+```{r}
+levels(FA_Dice_Array_init$Nerve) <- c(levels(FA_Dice_Array_init$Nerve), c("III","NF","NM","V")) 
+FA_Dice_Array_init$Nerve[FA_Dice_Array_init$Nerve == 'IIID' | FA_Dice_Array_init$Nerve == 'IIIG'] <- "III"
+FA_Dice_Array_init$Nerve[FA_Dice_Array_init$Nerve == 'NFD' | FA_Dice_Array_init$Nerve == 'NFG'] <- "NF"
+FA_Dice_Array_init$Nerve[FA_Dice_Array_init$Nerve == 'NMD' | FA_Dice_Array_init$Nerve == 'NMG'] <- "NM"
+FA_Dice_Array_init$Nerve[FA_Dice_Array_init$Nerve == 'VD' | FA_Dice_Array_init$Nerve == 'VG'] <- "V"
+```
+
+```{r}
+levels(FOD_Dice_Array_init$Nerve) <- c(levels(FOD_Dice_Array_init$Nerve), c("III","NF","NM","V")) 
+FOD_Dice_Array_init$Nerve[FOD_Dice_Array_init$Nerve == 'IIID' | FOD_Dice_Array_init$Nerve == 'IIIG'] <- "III"
+FOD_Dice_Array_init$Nerve[FOD_Dice_Array_init$Nerve == 'NFD' | FOD_Dice_Array_init$Nerve == 'NFG'] <- "NF"
+FOD_Dice_Array_init$Nerve[FOD_Dice_Array_init$Nerve == 'NMD' | FOD_Dice_Array_init$Nerve == 'NMG'] <- "NM"
+FOD_Dice_Array_init$Nerve[FOD_Dice_Array_init$Nerve == 'VD' | FOD_Dice_Array_init$Nerve == 'VG'] <- "V"
+```
+
+ **Homogénisation des variation du seuil de FA**
+```{r}
+levels(FA_Dice_Array_init$Condition) <- c(levels(FA_Dice_Array_init$Condition), c("FA1","FA2","FA3","FA4"))
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.1' & FA_Dice_Array_init$Nerve == 'NM'] <- "FA1"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.13' & FA_Dice_Array_init$Nerve == 'NM'] <- "FA2"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.16'& FA_Dice_Array_init$Nerve == 'NM'] <- "FA3"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.2' & FA_Dice_Array_init$Nerve == 'NM'] <- "FA4"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.2'] <- "FA1"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.23' ] <- "FA2"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.26'] <- "FA3"
+FA_Dice_Array_init$Condition[FA_Dice_Array_init$Condition == '_fa_0.3' ] <- "FA4"
+```
+
+```{r}
+levels(FOD_Dice_Array_init$Condition) <- c(levels(FOD_Dice_Array_init$Condition), c("FA1","FA2","FA3","FA4"))
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.1' & FOD_Dice_Array_init$Nerve == 'NM'] <- "FA1"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.13' & FOD_Dice_Array_init$Nerve == 'NM'] <- "FA2"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.16'& FOD_Dice_Array_init$Nerve == 'NM'] <- "FA3"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.2' & FOD_Dice_Array_init$Nerve == 'NM'] <- "FA4"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.2'] <- "FA1"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.23' ] <- "FA2"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.26'] <- "FA3"
+FOD_Dice_Array_init$Condition[FOD_Dice_Array_init$Condition == '_fa_0.3' ] <- "FA4"
+```
+
+##### Visualisation 
+```{r}
+summary(FA_Dice_Array_init)
+```
+
+```{r}
+summary(FOD_Dice_Array_init)
+```
+
+On a un certain nombre de valeur nule qui correspondent à des données manquante. On va les suprimer
+
+##### Supression des données incomplètes
+```{r}
+FA_Dice_Array <- subset(FA_Dice_Array_init,Dice_init !=0)
+FOD_Dice_Array <- subset(FOD_Dice_Array_init,Dice_init !=0)
+```
+
+```{r}
+summary(FA_Dice_Array)
+```
+
+```{r}
+summary(FOD_Dice_Array)
+```
+
+On va travailler sur 4 parametres:
+
+1. FA_threshold
+
+2. ROI Increase
+
+3. ROI Move Pos
+
+4. ROI Mode Lat
+
+###RESULTats
+##### Paramètre 1 : FA Thresh
+
+**Filtrage par FA ascendant**
+
+```{r}
+#Max
+Table <- subset(FA_Dice_Array, Parametre == "FA", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- Table$Dice_max
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FA")
+
+#Init
+Table <- subset(FA_Dice_Array, Parametre == "FA", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- Table$Dice_init
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=Dice_max-Dice_init
+ggplot(Table, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FA - Init")
+```
+
+**Filtrage par FOD ascendant**
+```{r}
+#Max
+Table <- subset(FOD_Dice_Array, Parametre == "FA", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- Table$Dice_max
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FOD")
+
+#Init
+Table <- subset(FOD_Dice_Array, Parametre == "FA", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- Table$Dice_init
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=Dice_max-Dice_init
+ggplot(Table, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FOD - Init")
+```
+
+
+##### Paramètre 2 : ROI_Increase
+
+**Filtrage par FA ascendant**
+```{r}
+#Max
+ROI_Increase_Dice <- subset(FA_Dice_Array, Parametre == "ROI_increase", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- ROI_Increase_Dice$Dice_max
+Condition<- ROI_Increase_Dice$Condition
+Nerve <- ROI_Increase_Dice$Nerve
+ggplot(ROI_Increase_Dice, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FA")
+
+#Init
+ROI_Increase_Base <- subset(FA_Dice_Array, Parametre == "ROI_increase", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- ROI_Increase_Base$Dice_init
+Condition<- ROI_Increase_Base$Condition
+Nerve <- ROI_Increase_Base$Nerve
+ggplot(ROI_Increase_Base, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=ROI_Increase_Dice$Dice_max-ROI_Increase_Base$Dice_init
+ggplot(ROI_Increase_Base, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FA - Init")
+```
+
+**Filtrage par FOD ascendant**
+
+```{r}
+## FOD
+#Max
+ROI_Increase_Dice <- subset(FOD_Dice_Array, Parametre == "ROI_increase", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- ROI_Increase_Dice$Dice_max
+Condition<- ROI_Increase_Dice$Condition
+Nerve <- ROI_Increase_Dice$Nerve
+ggplot(ROI_Increase_Dice, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FOD")
+
+#Init
+ROI_Increase_Base <- subset(FOD_Dice_Array, Parametre == "ROI_increase", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- ROI_Increase_Base$Dice_init
+Condition<- ROI_Increase_Base$Condition
+Nerve <- ROI_Increase_Base$Nerve
+ggplot(ROI_Increase_Base, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=ROI_Increase_Dice$Dice_max-ROI_Increase_Base$Dice_init
+ggplot(ROI_Increase_Base, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FOD - Init")
+```
+
+##### Paramètre 3 : ROI_moveLat
+
+**Filtrage par FA ascendant**
+```{r}
+#Max
+Table <- subset(FA_Dice_Array, Parametre == "ROI_moveLat", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- Table$Dice_max
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FA")
+
+#Init
+Table <- subset(FA_Dice_Array, Parametre == "ROI_moveLat", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- Table$Dice_init
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=Dice_max-Dice_init
+ggplot(Table, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FA - Init")
+```
+
+**Filtrage par FOD ascendant**
+```{r}
+#Max
+Table <- subset(FOD_Dice_Array, Parametre == "ROI_moveLat", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- Table$Dice_max
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FOD")
+
+#Init
+Table <- subset(FOD_Dice_Array, Parametre == "ROI_moveLat", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- Table$Dice_init
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=Dice_max-Dice_init
+ggplot(Table, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FOD - Init")
+```
+
+
+##### Paramètre 4 : ROI_movePos
+
+**Filtrage par FA ascendant**
+```{r}
+#Max
+Table <- subset(FA_Dice_Array, Parametre == "ROI_movePos", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- Table$Dice_max
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FA")
+
+#Init
+Table <- subset(FA_Dice_Array, Parametre == "ROI_movePos", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- Table$Dice_init
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=Dice_max-Dice_init
+ggplot(Table, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FA - Init")
+```
+
+**Filtrage par FOD ascendant**
+```{r}
+#Max
+Table <- subset(FOD_Dice_Array, Parametre == "ROI_movePos", select = c("Nerve","Condition","Dice_max"))
+# grouped boxplot
+Dice_max<- Table$Dice_max
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_max, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Max Dice, Filtered with FOD")
+
+#Init
+Table <- subset(FOD_Dice_Array, Parametre == "ROI_movePos", select = c("Nerve","Condition","Dice_init"))
+# grouped boxplot
+Dice_init<- Table$Dice_init
+Condition<- Table$Condition
+Nerve <- Table$Nerve
+ggplot(Table, aes(y=Dice_init, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Dice Init")
+
+#Diff
+Diff=Dice_max-Dice_init
+ggplot(Table, aes(y=Diff, x=Condition, fill=Nerve),title("ROI increase FA Filtering")) + geom_boxplot()+ggtitle("Filtered with FOD - Init")
+```
+
+
