@@ -1,3 +1,5 @@
+The data folder is not available in this repository. If you need it, please contact Méghane DECROOCQ (meghane.decroocq@creatis.insa-lyon.fr) or Carole FRINDEL (carole.frindel@creatis.insa-lyon.fr).
+
 # Tractography filtering quality : comparison between state of art (FA and FOD) and newly developed entropy-based methods
 
 ## Table of contents
